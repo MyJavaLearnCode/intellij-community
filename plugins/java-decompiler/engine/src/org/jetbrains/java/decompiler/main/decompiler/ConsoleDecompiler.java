@@ -63,14 +63,16 @@ public class ConsoleDecompiler implements IBytecodeProvider, IResultSaver {
       return;
     }
 
+    ConsoleDecompiler decompiler = null;
+    PrintStreamLogger logger = new PrintStreamLogger(System.out);
     File destination = new File(args[args.length - 1]);
-    if (!destination.isDirectory()) {
-      System.out.println("error: destination '" + destination + "' is not a directory");
-      return;
+    if (destination.isFile()) {
+      decompiler = new ConsoleDecompiler(destination.getParentFile(), mapOptions, logger, destination);
     }
 
-    PrintStreamLogger logger = new PrintStreamLogger(System.out);
-    ConsoleDecompiler decompiler = new ConsoleDecompiler(destination, mapOptions, logger);
+    if (destination.isDirectory()) {
+      decompiler = new ConsoleDecompiler(destination.getParentFile(), mapOptions, logger);
+    }
 
     for (File source : sources) {
       decompiler.addSource(source);
@@ -98,13 +100,19 @@ public class ConsoleDecompiler implements IBytecodeProvider, IResultSaver {
   // *******************************************************************
 
   private final File root;
+  private final File targetFile;
   private final Fernflower engine;
   private final Map<String, ZipOutputStream> mapArchiveStreams = new HashMap<>();
   private final Map<String, Set<String>> mapArchiveEntries = new HashMap<>();
 
   protected ConsoleDecompiler(File destination, Map<String, Object> options, IFernflowerLogger logger) {
+    this(destination, options, logger, null);
+  }
+
+  protected ConsoleDecompiler(File destination, Map<String, Object> options, IFernflowerLogger logger, File specTargetFile) {
     root = destination;
     engine = new Fernflower(this, this, options, logger);
+    targetFile = specTargetFile;
   }
 
   public void addSource(File source) {
@@ -172,6 +180,9 @@ public class ConsoleDecompiler implements IBytecodeProvider, IResultSaver {
   @Override
   public void saveClassFile(String path, String qualifiedName, String entryName, String content, int[] mapping) {
     File file = new File(getAbsolutePath(path), entryName);
+    if (targetFile != null) {
+      file = targetFile;
+    }
     try (Writer out = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
       out.write(content);
     }
